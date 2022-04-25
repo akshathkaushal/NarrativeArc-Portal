@@ -1,0 +1,22 @@
+#Buttons {
+    padding-left: 2em;
+}
+
+#Content {
+    padding-left: 3em;
+    padding-top: 1em;
+}
+
+#Content-content {
+    color: black;
+    font-size: larger;
+}
+
+#template_question {
+    color: black;
+    font-size: larger;
+}
+
+.question {
+    font-size: x-large;
+}

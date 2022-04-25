@@ -1,0 +1,1108 @@
+<div class="container">
+    <div class="row">
+        <!-- <div class="col-4"></div> -->
+        <div id="navigate-url" class="col-12">
+            <center>
+                <button type="button" style="margin-right: 10px;" class="btn btn-primary" onclick="play_next_resource()">Next</button>
+            </center>
+        </div>
+        <!-- <div class="col-4"></div> -->
+    </div>
+</div>
+
+<div id="overview" class="overview" style="visibility: hidden">
+    <div class="overview-content">
+        <div class="close" display="inline">&times;</div>
+
+        <div class="overview-header" id="overview-header"></div>
+        <div id="fetched-overview"></div>
+    </div>
+</div>
+
+<script>
+    // Get the modal
+    var modal = document.getElementById("overview");
+
+    // Get the <span> element that closes the modal
+    var closebtn = document.getElementsByClassName("close")[0];
+
+
+    // When the user clicks on <span> (x), close the modal
+    closebtn.onclick = function() {
+        modal.style.visibility = "hidden";
+    }
+
+    // When the user clicks anywhere outside of the modal, close it
+    window.onclick = function(event) {
+        if (event.target == modal) {
+            modal.style.display = "none";
+        }
+    }
+</script>
+
+<!--  -->
+<!--  -->
+
+<script>
+    // Global Variables are defined here
+    myStorage = window.localStorage;
+    var resource_url_list = {};
+    var resource_ids = {};
+    var KeysDone;
+    var keys = Object.keys(resource_url_list);
+    var resource_count = 0;
+    var this_pathway_id = <%- JSON.stringify(id) %>;
+    var user_progress;
+
+    function switchBottoSummarization() {
+        // $('#rasaWebchatPro').hide();
+        // document.getElementById("chatbody").style.visibility = 'visible';
+    }
+
+    function switchBottoRasa() {
+        // $('#rasaWebchatPro').show();
+        // document.getElementById("chatbody").style.visibility = 'hidden';
+    }
+
+    // Function to save the progress to the database
+    function save2db() {
+        data = JSON.parse(myStorage.getItem('user_progress'));
+        console.log(data);
+        $.ajax({
+            type: 'POST',
+            data: JSON.stringify(data),
+            contentType: 'application/json',
+            url: '/narrativeArc/setUserProgress', //calling the api					
+            success: function(data) {
+                console.log('success');
+            }
+        })
+    }
+    //Calls the render function for current resource
+    function GoToResource() {
+        //console.log(resource_url_list);
+        //console.log(keys[KeysDone]);
+        document.getElementById("navigate-url").style.visibility = 'visible';
+        switchBottoRasa();
+        render(resource_url_list[keys[KeysDone]][resource_count]);
+    }
+
+    //Navigates to next resource 	
+
+    function play_next_resource() {
+        switchBottoRasa();
+        resource_count++;
+        console.log(KeysDone, resource_url_list[keys[KeysDone]]);
+        keys = Object.keys(resource_url_list);
+        if (KeysDone < Object.keys(resource_url_list).length) {
+            if (resource_count == resource_url_list[keys[KeysDone]].length) {
+                if (KeysDone == Object.keys(resource_url_list).length - 1) {
+                    document.getElementById("content").style.display = '';
+                    document.getElementById("divTxtModal").style.display = 'none';
+                    // window.alert("Segment Completed. Please attempt a quiz now");
+                    switchBottoSummarization();
+                    TakeQuiz();
+                    document.getElementById("navigate-url").style.visibility = 'hidden';
+                    collection_id = JSON.parse(localStorage.getItem('user_progress'))['collection_id']
+                    game.reset();
+                    game.init();
+                    game.SetUpQuestion(collection_id);
+                    resource_count = -1;
+                    KeysDone += 1;
+                    console.log('Came to the end of the pathway!! Congratulations');
+
+
+                } else {
+                    //summary_of_three_resources = `You have successfully completed the segment of the learning pathway. ${keys[KeysDone]} How about a short quiz ?`;
+                    //document.getElementById("summary_button").click();
+                    //document.getElementById("content").style.display= '';
+
+                    // document.getElementById("renderedresource").src = '';
+                    document.getElementById("content").style.display = '';
+                    document.getElementById("divTxtModal").style.display = 'none';
+                    //document.getElementById("player").style.display= 'none';
+                    // show_summary_for_three_resources();
+                    // console.log("came here to show three resources");
+                    // window.alert("Segment Completed. Please attempt a quiz now");
+                    switchBottoSummarization();
+                    TakeQuiz();
+                    document.getElementById("navigate-url").style.visibility = 'hidden';
+                    collection_id = JSON.parse(localStorage.getItem('user_progress'))['collection_id']
+                    game.reset();
+                    game.init();
+                    game.SetUpQuestion(collection_id);
+                    resource_count = -1;
+                    KeysDone += 1;
+                }
+            } else {
+                currentgpID = keys[KeysDone];
+                updateUserCurrent_resource(resource_count);
+                updateUserCurrent_gp(currentgpID);
+
+                document.getElementById("content").style.display = 'none';
+                document.getElementById("divTxtModal").style.display = '';
+                //document.getElementById("player").style.display= 'none';
+
+                document.getElementById("navigate-url").style.visibility = 'visible';
+                render(resource_url_list[currentgpID][resource_count])
+                console.log(resource_count);
+            }
+        } else {
+            console.log('Omkar');
+        }
+    }
+
+    function render(location) {
+        // ....Call to update session storage
+        save2db();
+        // .....
+        var txt = "";
+        var locationList = location.split("/");
+        var originalName = locationList[locationList.length - 1];
+        // txt = '<iframe src="../datastore/raw/' + originalName + '" width="100%" height="720px;" allow="fullscreen" style="overflow: auto;"></iframe>';
+        txt = '<center><video width="1080" style="margin-top: 2rem;" controls> <source src="../datastore/raw/' + originalName + '" type="video/mp4"></video></center>'
+        const divTxtModal = document.getElementById("divTxtModal");
+        divTxtModal.innerHTML = txt;
+    }
+
+    // ...............................................................................
+    // Overview logic
+    // ...............................................................................
+
+    function get_overview(collection_id) {
+        $.ajax({
+            url: "http://44.231.142.215:5000/GetOverview/" + String(collection_id) + "/" + String(keys[KeysDone]),
+            type: "GET",
+            success: function(data) {
+                _overview = data.overview;
+                //alert(summary_of_three_resources)
+                //document.getElementById("summary_button").click();
+                GiveOverview(_overview);
+                //alert(_overview)
+            },
+            error: function(error) {
+                console.log(error);
+            }
+        })
+    }
+
+
+    // ........
+    // Session Storage Logic
+    // ........
+
+    function NewUserStorage() {
+        user_progress = {
+            'user_id': <%- JSON.stringify(Conversation_ID) %>,
+            'pathway_id': <%- JSON.stringify(id) %>,
+            'collection_id': <%- JSON.stringify(id) %>,
+            'resource_ids': {},
+            // 'current_resource_id': null,
+            // 'current_gp_id': null,
+            'current_resource_id': 0,
+            'current_gp_id': 1,
+            'quizzes': []
+        }
+    }
+
+    function SettingResourceIds() {
+        var resourceList = <%- JSON.stringify(resourceList) %>;
+        var resourceIds = <%- JSON.stringify(resourceIds) %>;
+        var groupIds = <%- JSON.stringify(groupIds) %>;
+        /*Populating lists*/
+        for (let i = 0; i < groupIds.length; i++) {
+            resource_url_list[groupIds[i]] = new Array();
+            resource_ids[groupIds[i]] = new Array();
+        }
+        for (let i = 0; i < groupIds.length; i++) {
+            resource_url_list[groupIds[i]].push(resourceList[i].resourceLocation.originalLocation);
+            resource_ids[groupIds[i]].push(resourceIds[i]);
+        }
+        console.log(resource_url_list);
+        KeysDone = 0;
+        keys = Object.keys(resource_url_list); // List of Keys
+        resource_count = 0;
+    }
+
+    function RenderProgress(user_progress) {
+        if (user_progress.collection_id) {
+            SettingResourceIds();
+            //resource_url_list = user_progress.resource_ids;
+            keys = Object.keys(resource_url_list);
+            KeysDone = keys.indexOf(user_progress.current_gp_id);
+            resource_count = parseInt(user_progress.current_resource_id);
+            console.log(resource_count, resource_url_list, KeysDone, user_progress.current_resource_id)
+            document.getElementById("navigate-url").style.visibility = 'visible';
+            render(resource_url_list[keys[KeysDone]][resource_count]);
+        } else {
+            console.log("hello");
+            resource_url_list = {};
+            KeysDone;
+            keys = Object.keys(resource_url_list);
+            resource_count = 0;
+            return;
+        }
+    }
+
+    function SetUpUserProgress() {
+        user_progress = <%- JSON.stringify(progress) %>;
+        console.log("User Progress from server : ", user_progress)
+        if (user_progress) {
+            myStorage.setItem('user_progress', JSON.stringify(user_progress));
+            console.log("Second Test: Loading user storage")
+            RenderProgress(user_progress);
+            return;
+        } else {
+            NewUserStorage();
+            console.log("First Test: Initialising user storage");
+            console.log(JSON.stringify(user_progress));
+
+            // akshath
+            // collection_id = JSON.parse(localStorage.getItem('user_progress'))['collection_id']
+            collection_id = user_progress['collection_id'];
+            get_overview(collection_id);
+
+            setTimeout(function() {
+                GoToResource();
+            }, 3010);
+
+        }
+        myStorage.setItem('user_progress', JSON.stringify(user_progress));
+    }
+
+
+    function updateUserpathwayId(pathway_id) {
+        user_progress = JSON.parse(myStorage.getItem('user_progress'));
+        user_progress.pathway_id = pathway_id;
+        myStorage.setItem('user_progress', JSON.stringify(user_progress));
+    }
+
+    function updateUserCollection(collection_id) {
+        user_progress = JSON.parse(myStorage.getItem('user_progress'));
+        user_progress.collection_id = collection_id;
+        myStorage.setItem('user_progress', JSON.stringify(user_progress));
+    }
+
+    function updateUserResource(resources) {
+        user_progress = JSON.parse(myStorage.getItem('user_progress'));
+        user_progress.resource_ids = resources
+        myStorage.setItem('user_progress', JSON.stringify(user_progress));
+    }
+
+    function updateUserCurrent_resource(resource_index) {
+        console.log("Update Current Resource was called");
+        user_progress = JSON.parse(myStorage.getItem('user_progress'));
+        user_progress.current_resource_id = resource_index;
+        myStorage.setItem('user_progress', JSON.stringify(user_progress));
+    }
+
+    function updateUserCurrent_gp(gp_index) {
+        console.log("Update Current Group was called");
+        user_progress = JSON.parse(myStorage.getItem('user_progress'));
+        console.log(user_progress);
+        user_progress.current_gp_id = gp_index;
+        myStorage.setItem('user_progress', JSON.stringify(user_progress));
+    }
+
+    function updateUserQuiz(QuizNumber, TotalQuestions, CorrectAnswers) {
+        console.log("Update User Quiz was called");
+        user_progress = JSON.parse(myStorage.getItem('user_progress'));
+        console.log(user_progress);
+        user_progress.quizzes.push({
+            QuizNumber: QuizNumber,
+            TotalQuestion: TotalQuestions,
+            CorrectAnswers: CorrectAnswers
+        });
+        myStorage.setItem('user_progress', JSON.stringify(user_progress));
+    }
+    window.onload = function() {
+        SettingResourceIds();
+        SetUpUserProgress();
+        $('#rasaWebchatPro').hide();
+        //document.getElementById("navigate-url").style.visibility = 'hidden';
+    };
+</script>
+
+<!-- .................
+  Quiz Display Logic
+........ -->
+<div id="container">
+    <div id="content" class="fx-tiles" style="display: none">
+        <!-- FULL WIDTH LAYOUT -->
+        <div class="fx-grid fx-cf">
+            <div class="fx-col">
+                <!-- ADD BLOCK(S) HERE -->
+                <!-- START: SHARE BLOCK -->
+                <div class="fx-block fx-purple fx-share fx-align-left fx-cf purple-bg" style="padding:20px">
+                    <div class="fx-copy" style="padding-left:20px; padding-bottom:0">
+                        <h2><b>Quiz</b></h2>
+                        <h6>Click Start once you are ready</h6>
+                        <p><a href="#game" id="start-button" class="fx-btn">Start Test</a></p>
+                    </div>
+                </div>
+            </div>
+            <!-- FULL WIDTH LAYOUT -->
+            <div class="fx-grid fx-cf">
+                <div class="fx-col">
+                    <!-- ADD BLOCK(S) HERE -->
+                    <div class="fx-block game-container">
+                        <div id="game">
+                            <div class="game-grid">
+                                <p id="timer" class="timer">
+                                    1:00:00
+                                </p>
+                                <div class="game-left-col">
+                                    <div class="gauge-container" style="background: #ffffff  no-repeat center center; background-size: 100px 100px;">
+                                        <canvas id="gauge" class="gauge" width="240" height="240"></canvas>
+                                        <div class="score-number">0</div>
+                                    </div>
+                                </div>
+                                <div class="game-right-col">
+                                    <div class="questions">
+                                        <!-- Questions are filled here by SetUpQuestion() -->
+                                    </div>
+                                    <div id="game-end">
+                                        <p id="game-end-text" class="game-end-text"></p>
+                                        <button class="fx-btn" onclick="resume_learning()"> Resume learning </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- <div id="progress-bar" class="progress-bar">
+                                <div class="indicator current"></div>
+                                <div class="indicator"></div>
+                                <div class="indicator"></div>
+                                <div class="indicator"></div>
+                            </div> -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+<!-- GLOBAL WRAPPER CSS -->
+<!-- MASTER RESPONSIVE JAVASCRIPT (Keep below footer include) -->
+<script type="text/javascript" src="//images.fedex.com/templates/components/libraries/1.0/jQuery/1.7.2/jquery.min.js"></script>
+<script type="text/javascript" src="//www.fedex.com/templates/components/javascript/v2/fx-master-responsive.js"></script>
+<link rel="stylesheet" type="text/css" href="//www.fedex.com/css/t2/global-wrapper-min.css" id="globalCSS" />
+<!-- MASTER RESPONSIVE CSS -->
+<link rel="stylesheet" type="text/css" href="//www.fedex.com/css/t2/master-responsive-min.css" />
+
+
+
+<script>
+    // -----------------------------------------------------------------------------
+    // -----------------------------------------------------------------------------
+    // ################## QUIZ GAME DISPLAY CODE LOGIC HERE  #######################
+    // -----------------------------------------------------------------------------
+    // -----------------------------------------------------------------------------
+
+    function close_window() {
+        // if (confirm("Close Window?")) {
+            close();
+        // }
+    }
+    function resume_learning() {
+        if (resource_url_list[keys[KeysDone]] === undefined) {
+            switchBottoSummarization();
+            document.getElementById("content").style.display = 'none';
+            document.getElementById("divTxtModal").style.display = '';
+            document.getElementById("divTxtModal").innerHTML = '<div class="finished" style=" text-align: center ;padding:200px 0  " ><h1>Congratulations!<br>You have completed the last segment of the learning!!!</h1><div class="btn btn-primary" onclick="close_window();return false;">Back to Map</div></div>';
+            // document.getElementById("divTxtModal").innerHTML += '<div class="btn btn-primary" onclick="close_window();return false;">Back to Map</div>';
+            summary_of_three_resources = `Congratulations! You have completed the last segment of the learning pathway!! How about summarising what you have learnt?`;
+            console.log(summary_of_three_resources)
+            TakeSummary();
+        } else {
+            switchBottoSummarization();
+            document.getElementById("content").style.display = 'none';
+            //user_progress = localStorage.getItem('user_progress')
+            collection_id = JSON.parse(localStorage.getItem('user_progress'))['collection_id']
+                //show_summary_for_three_resources(collection_id);
+            get_overview(collection_id);
+            setTimeout(function() {
+                play_next_resource();
+            }, 3010);
+
+        }
+        //document.getElementById("player").style.display= 'none';
+
+    }
+
+
+    var game = {
+        // state and jquery selectors
+        state: {
+            QuizNumber: 0,
+            startButton: $("#start-button"),
+            gameContainer: $("#game"),
+            scoreNumber: $(".score-number"),
+            questionsView: $(".questions"),
+            gameEndView: $("#game-end"),
+            gameEndViewTimesUp: $("#game-end-times-up"),
+            gameEndText: $("#game-end-text"),
+            timeOutText: $("#time-out-text"),
+            gauge: $("#gauge"),
+            questions: $(".question"),
+            answers: $(".answer"),
+            timer: $("#timer"),
+            indicators: $(".indicator"),
+            numberOfQuestions: $(".question").length,
+            questionsAnswered: 0,
+            correctAnswers: 0
+        },
+
+        init: function() {
+            game.state.startButton = $("#start-button"),
+                game.state.gameContainer = $("#game"),
+                game.state.scoreNumber = $(".score-number"),
+                game.state.questionsView = $(".questions"),
+                game.state.gameEndView = $("#game-end"),
+                game.state.gameEndViewTimesUp = $("#game-end-times-up"),
+                game.state.gameEndText = $("#game-end-text"),
+                game.state.gauge = $("#gauge"),
+                game.state.questions = $(".question"),
+                game.state.answers = $(".answer"),
+                game.state.timer = $("#timer"),
+                game.state.indicators = $(".indicator"),
+                game.state.numberOfQuestions = $(".question").length,
+                game.state.questionsAnswered = 0,
+                game.state.correctAnswers = 0
+        },
+
+        registerEventHandlers: function() {
+            game.state.answers.on("click touch", function(e) {
+                //e.preventDefault();
+                game.checkAnswer($(this));
+            });
+
+            game.state.startButton.on("click touch", function(e) {
+                e.preventDefault();
+                game.state.QuizNumber += 1;
+                $('#game').show();
+                game.start();
+            });
+        },
+
+        SetUpQuestion: function(collection_id) {
+            game.GenerateQuestion(collection_id)
+                .then((data) => {
+                    Parsed_data = data['question']
+                    console.log(Parsed_data)
+                    for (var i = 0; i < Parsed_data.n; i++) {
+                        console.log("New data \n", Parsed_data);
+                        questionNumber = 'ques' + String(i + 1);
+                        console.log(Parsed_data[questionNumber])
+                        $(".questions").append(`
+		 <div class="question">
+                        <p><div display='inline-block' class="number">${i+1} </div><div display='inline-block' class="questionText">${Parsed_data[questionNumber]['ques']}</div></p>
+                        <div class="answers">
+                          <label><input type="checkbox" class="answer" data-correct="true"><div display='inline-block' class="text">A. ${Parsed_data[questionNumber]['answer']}</div></label>
+                          <label><input type="checkbox" class="answer" data-correct="false"><div display='inline-block' class="text">B. ${Parsed_data[questionNumber]['option1']}</div></label>
+                          <label><input type="checkbox" class="answer" data-correct="false"><div display='inline' class="text">C. ${Parsed_data[questionNumber]['option2']}</div></label>
+                          <label><input type="checkbox" class="answer" data-correct="false"><div display='inline' class="text">D. ${Parsed_data[questionNumber]['option3']}</div></label>
+                        </div>
+					  </div>
+		`);
+                    }
+                    game.state.questionsView = $(".questions");
+                    game.state.questions = $(".question");
+                    game.state.answers = $(".answer");
+                    game.state.numberOfQuestions = Parsed_data.n;
+                    game.questionsView = $(".questions");
+                    console.log(game.state.questionsView);
+                    game.registerEventHandlers();
+                })
+                .catch((error) => {
+                    console.log(error);
+                })
+        },
+        GenerateQuestion: function(collection_id) {
+            return new Promise((resolve, reject) => {
+                console.log("I am fetching the questions via an api");
+                keys = Object.keys(resource_url_list)
+                console.log(keys[KeysDone])
+                console.log("http://44.231.142.215:5000/GetQuizDetails/" + String(collection_id) + "/" + String(keys[KeysDone]))
+                $.ajax({
+                    url: "http://44.231.142.215:5000/GetQuizDetails/" + String(collection_id) + "/" + String(keys[KeysDone]),
+                    type: "GET",
+                    success: function(data) {
+                        console.log(data)
+                            // console.log(JSON.parse(data));
+                        resolve(data);
+                    },
+                    error: function(error) {
+                        reject(error);
+                    }
+                })
+            })
+        },
+        start: function() {
+            console.log('starting quiz')
+            game.state.gameContainer.addClass("show");
+            $("html, body").animate({
+                    scrollTop: game.state.gameContainer.offset().top - 10
+                },
+                400,
+                game.startTimer()
+            );
+            game.state.startButton.unbind("click touch");
+        },
+
+        startTimer: function() {
+            console.log("came to start timer");
+            var zeroFill = function(units) {
+                return units < 10 ? "0" + units + "" : units;
+            };
+            var count = 0;
+
+            var interval = window.setInterval(function() {
+                var centisecondsRemaining = 2000 - count;
+                var min = Math.floor(centisecondsRemaining / 100 / 60);
+                var sec = zeroFill(Math.floor(centisecondsRemaining / 100 % 60));
+                var cs = zeroFill(centisecondsRemaining % 100);
+                game.state.timer.text(min + ":" + sec + ":" + cs);
+                count++;
+                if (centisecondsRemaining === 0) {
+                    clearInterval(interval);
+                    //game.endGame();
+                    game.timesUp();
+                }
+                if (game.state.questionsAnswered === game.state.numberOfQuestions) {
+                    clearInterval(interval);
+                }
+                if (game.state.questionsAnswered === game.state.numberOfQuestions) {
+                    clearInterval(interval);
+                }
+            }, 10);
+        },
+
+        checkAnswer: function(answer) {
+            if (answer.data("correct")) {
+                game.state.correctAnswers++;
+                game.drawGaugeValue();
+                game.updateProgress(true);
+                game.giveAnswerFeedback(answer);
+            } else {
+                game.updateProgress(false);
+                game.giveAnswerFeedback(answer);
+            }
+            game.state.questionsAnswered++;
+
+            // wait a second
+            window.setTimeout(function() {
+                //end game else go to next question
+                if (game.state.questionsAnswered === game.state.numberOfQuestions) {
+                    game.endGame();
+                } else {
+                    game.goToNextQuestion();
+                }
+            }, 1000);
+        },
+
+        drawGaugeValue: function() {
+            var currentValue =
+                100 /
+                (game.state.numberOfQuestions / (game.state.correctAnswers - 1)) /
+                100;
+            var nextValue = currentValue + 100 / game.state.numberOfQuestions / 100;
+
+            var draw = function(currentValue, nextValue) {
+                var bg = game.state.gauge[0];
+                var ctx = (ctx = bg.getContext("2d"));
+                var imd = null;
+
+                var startRad = 0.75;
+                var totalRads = 1.5;
+
+                var sAngle = Math.PI * startRad;
+
+                ctx.beginPath();
+                ctx.strokeStyle = "#47338f";
+                ctx.lineCap = "round";
+                ctx.closePath();
+                ctx.fill();
+                ctx.lineWidth = 10.0;
+
+                imd = ctx.getImageData(0, 0, 240, 240);
+
+                $({
+                    n: currentValue
+                }).animate({
+                    n: nextValue
+                }, {
+                    duration: 1000 * nextValue,
+                    step: function(now, fx) {
+                        game.state.scoreNumber.text(Math.ceil(now * 100));
+                        ctx.putImageData(imd, 0, 0);
+                        ctx.beginPath();
+                        ctx.arc(
+                            120,
+                            120,
+                            100,
+                            sAngle,
+                            (totalRads * now + startRad) * Math.PI,
+                            false
+                        );
+                        ctx.stroke();
+                    }
+                });
+            };
+            draw(currentValue, nextValue);
+        },
+
+        updateProgress: function(correct) {
+            $(game.state.indicators[game.state.questionsAnswered]).addClass(
+                correct ? "correct" : "incorrect"
+            );
+            $(game.state.indicators).removeClass("current");
+            $(game.state.indicators[game.state.questionsAnswered + 1]).addClass(
+                "current"
+            );
+        },
+
+        giveAnswerFeedback: function(answer) {
+            var answerGroup = answer.parent().parent().find(".answer");
+            for (var i = 0; i < answerGroup.length; i++) {
+                // disable extra clicks
+                answerGroup[i].disabled = true;
+                if ($(answerGroup[i]).data("correct")) {
+                    $(answerGroup[i]).parent().addClass("correct");
+                } else {
+                    $(answerGroup[i]).parent().addClass("incorrect");
+                }
+            }
+        },
+
+        goToNextQuestion: function() {
+            var lastQuestionIndex = game.state.questionsAnswered - 1;
+            var nextQuestionIndex = game.state.questionsAnswered;
+            $(game.state.questions[lastQuestionIndex]).fadeOut(400, function() {
+                $(game.state.questions[nextQuestionIndex]).fadeIn(200);
+            });
+        },
+        timesUp: function() {
+            var endText =
+                "Looks like you’ve run out of time.<br />No worries. You can play up to 5 times a day.";
+            game.state.questionsView.fadeOut(400, function() {
+                game.state.gameEndText[0].innerHTML = endText;
+                game.state.gameEndViewTimesUp.fadeIn(200);
+            });
+        },
+        reset: function() {
+            $('.game-container').html('')
+            $('.game-container').html(`
+	<div id="game">
+                <div class="game-grid">
+                  <p id="timer" class="timer">
+                    1:00:00
+                  </p>
+                  <div class="game-left-col">
+                    <div class="gauge-container" style="background: #ffffff no-repeat center center; background-size: 100px 100px;">
+                      <canvas id="gauge" class="gauge" width="240" height="240"></canvas>
+                      <div class="score-number">0</div>
+                    </div>
+                  </div>
+                  <div class="game-right-col">
+                    <div class="questions">
+                      <!--<div class="question">
+                        <p><span class="number">1 </span><span class="questionText">what is the act of breathing in and then exhaling?</span></p>
+                        <div class="answers">
+                          <label><input type="checkbox" class="answer" data-correct="true"><span class="text">A. Respiration</span></label>
+                          <label><input type="checkbox" class="answer" data-correct="false"><span class="text">B. Nucleate</span></label>
+                          <label><input type="checkbox" class="answer" data-correct="false"><span class="text">C. peristalsis</span></label>
+                          <label><input type="checkbox" class="answer" data-correct="false"><span class="text">D. transpiration</span></label>
+                        </div>
+                      </div>
+                      <div class="question">
+                        <p><span class="number">2 </span><span class="questionText">what is the smallest portion of an element that contains the chemical traits of the element?</span></p>
+                        <div class="answers">
+                          <label><input type="checkbox" class="answer" data-correct="true"><span class="text">A. atom</span></label>
+                          <label><input type="checkbox" class="answer" data-correct="false"><span class="text">B. nucleons</span></label>
+                          <label><input type="checkbox" class="answer" data-correct="false"><span class="text">C. electron</span></label>
+                                    <label><input type="checkbox" class="answer" data-correct="false"><span class="text">D. coccinellid</span></label>
+                        </div>
+                      </div>
+                      <div class="question">
+                        <p><span class="number">3 </span><span class="questionText">What is a dense thickening of azoospermia cytoplasm in the shell of a fish?
+                        </span></p>
+                        <div class="answers">
+                         <label><input type="checkbox" class="answer" data-correct="false"><span class="text">A. deipnophobia</span></label>
+                          <label><input type="checkbox" class="answer" data-correct="false"><span class="text">B. cytokinisis</span></label>
+                                            <label><input type="checkbox" class="answer" data-correct="true"><span class="text">C. mitosis</span></label>
+                          <label><input type="checkbox" class="answer" data-correct="false"><span class="text">D. apoptosis</span></label>
+                        </div>
+                      </div>
+                      <div class="question">
+                        <p><span class="number">4 </span><span class="questionText">What is a disease or illness of the flesh organ or tissue of a person or animal?</span></p>
+                        <div class="answers">
+                          <label><input type="checkbox" class="answer" data-correct="false"><span class="text">A. cytokinesis</span></label>
+                          <label><input type="checkbox" class="answer" data-correct="true"><span class="text">B. meiosis</span></label>
+                          <label><input type="checkbox" class="answer" data-correct="false"><span class="text">C.  sarinda</span></label>
+                                                    <label><input type="checkbox" class="answer" data-correct="false"><span class="text">D. polyploidy</span></label>
+                        </div>
+                      </div>-->
+                    </div>
+<!--                     <div id="game-end-times-up">
+                      <p id="time-out-text" class="game-end-text"></p>
+                      <a href="./challenge-page.html" class="fx-btn">Play again</a>
+
+                    </div> -->
+                    <div id="game-end">
+                      <p id="game-end-text" class="game-end-text"></p>
+                      <button class="fx-btn" onclick="resume_learning()"> Resume learning </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+		`);
+            $("#game-end-text").html('');
+        },
+
+        endGame: function() {
+            var endText =
+                'You got<br><div display="inline" class="score">' +
+                game.state.correctAnswers +
+                " out of " +
+                game.state.numberOfQuestions +
+                "</div> correct";
+            game.state.questionsView.fadeOut(400, function() {
+                game.state.gameEndText[0].innerHTML = endText;
+                game.state.gameEndView.fadeIn(200);
+            });
+            updateUserQuiz(game.state.QuizNumber, game.state.numberOfQuestions, game.state.correctAnswers);
+            if (game.state.correctAnswers / game.state.numberOfQuestions < 0.5) {
+                console.log('came here');
+                // summary_of_three_resources = `Looks Like your score was a bit low would you like to reiterate through the resources ?`;
+                // document.getElementById("summary_button").click();
+                QuizRedirect();
+            }
+        }
+    };
+
+    game.init();
+
+    var drawGaugeBackground = function() {
+        var bg = $("#gauge")[0];
+        var ctx = bg.getContext("2d");
+        var imd = null;
+        var sAngle = Math.PI * 0.75;
+        var eAngle = Math.PI * 0.25;
+
+        ctx.beginPath();
+        ctx.strokeStyle = "#f4f4f4";
+        ctx.lineCap = "round";
+        ctx.closePath();
+        ctx.fill();
+        ctx.lineWidth = 30.0;
+
+        imd = ctx.getImageData(0, 0, 240, 240);
+
+        ctx.putImageData(imd, 0, 0);
+        ctx.beginPath();
+        ctx.arc(120, 120, 100, sAngle, eAngle, false);
+        ctx.stroke();
+    };
+
+    drawGaugeBackground();
+</script>
+
+<!----------------------------------------- SUMMARIZATION CHATBOT  ----------------------------------->
+
+<div id="chatbody">
+    <div id="chat-circle" class="btn btn-raised" style="display: block;">
+        <div class="message-image">
+            <i class="material-icons">chat_bubble</i>
+        </div>
+    </div>
+    <div class="chat-box">
+        <div class="chat-box-header"> PEDAGOGIC AGENT
+            <div display='inline' class="chat-box-toggle"><i class="material-icons">close</i></div>
+        </div>
+        <div class="chat-box-body">
+            <div class="chat-box-overlay"></div>
+            <div class="chat-logs" id="chat-logs"></div>
+        </div>
+        <div class="chat-input">
+            <form>
+                <textarea id="chat-input" placeholder="Send a message..."></textarea>
+                <button type="submit" class="chat-submit" id="chat-submit"><i class="material-icons">send</i></button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    var score = 1.01;
+    //----------------------------------Summarization Chatbot -------------------------------------
+    async function GetSummaryScore(msg, collection_id) {
+        $.ajax({
+                data: {
+                    answer: msg,
+                    username: 'Saksham',
+                    collection_id: <%- JSON.stringify(id) %>,
+                    user_id: <%- JSON.stringify(Conversation_ID) %>
+                },
+                dataType: 'json',
+                type: 'POST',
+                url: 'http://44.231.142.215:5000/result'
+            })
+            .done(function(data) {
+                console.log("success", data.success);
+
+                if (data.success) {
+                    generate_message_correct(msg, 'self');
+                    Feedback('This is great, I see that you have understood this segment of the learning pathway well. You can now exit!');
+
+                } else {
+                    generate_message_incorrect(msg, 'self');
+                    Feedback("I see that you are not fully comfortable with this pathway's content, I suggest you to revise the pathway again! Do you want to revisit the resources?");
+                }
+                score = data.score;
+                console.log(score);
+            });
+    }
+
+    var INDEX = 0;
+    $("#chat-submit").click(async function(e) {
+        e.preventDefault();
+        var msg = $("#chat-input").val();
+        if (msg.trim() == '') {
+            return false;
+        }
+        if(msg == 'yes' && resource_url_list[keys[KeysDone]] === undefined)
+        {
+            document.getElementById("chat-logs").innerHTML='';
+            $(".chat-box").toggle('scale');
+            RestartSegment();
+
+            
+        }
+        else if(msg == 'no' && resource_url_list[keys[KeysDone]] === undefined)
+        {
+            generate_message("no", 'self'); 
+            generate_message("Okay");   
+        }
+        else if (resource_url_list[keys[KeysDone]] === undefined)
+        {
+            var user_summary_score;
+            console.log(collection_id);
+            user_summary_score = await GetSummaryScore(msg, collection_id);
+        }
+        
+    })
+
+    function generate_message(msg, type) {
+        INDEX++;
+        var str = "";
+        str += "<div id='cm-msg-" + INDEX + "' class=\"chat-msg " + type + "\">";
+        //str += "          <span class=\"msg-avatar\">";
+        //str += "            <img src=\"https:\/\/image.crisp.im\/avatar\/operator\/196af8cc-f6ad-4ef7-afd1-c45d5231387c\/240\/?1483361727745\">";
+        //str += "          <\/span>";
+        str += "          <div class=\"cm-msg-text\">";
+        str += msg;
+        str += "          <\/div>";
+        str += "        <\/div>";
+        $(".chat-logs").append(str);
+        $("#cm-msg-" + INDEX).hide().fadeIn(300);
+        if (type == 'self') {
+            $("#chat-input").val('');
+        }
+        $(".chat-logs").stop().animate({
+            scrollTop: $(".chat-logs")[0].scrollHeight
+        }, 1000);
+    }
+
+    function generate_message_correct(msg, type) {
+        INDEX++;
+        var str = "";
+        str += "<div id='cm-msg-" + INDEX + "' class=\"chat-msg " + type + "-correct" + "\">";
+        //str += "          <span class=\"msg-avatar\">";
+        //str += "            <img src=\"https:\/\/image.crisp.im\/avatar\/operator\/196af8cc-f6ad-4ef7-afd1-c45d5231387c\/240\/?1483361727745\">";
+        //str += "          <\/span>";
+        str += "          <div class=\"cm-msg-text\">";
+        str += msg;
+        str += "          <\/div>";
+        str += "        <\/div>";
+        $(".chat-logs").append(str);
+        $("#cm-msg-" + INDEX).hide().fadeIn(300);
+        if (type == 'self') {
+            $("#chat-input").val('');
+        }
+        $(".chat-logs").stop().animate({
+            scrollTop: $(".chat-logs")[0].scrollHeight
+        }, 1000);
+    }
+
+    function generate_message_incorrect(msg, type) {
+        INDEX++;
+        var str = "";
+        str += "<div id='cm-msg-" + INDEX + "' class=\"chat-msg " + type + "-incorrect" + "\">";
+        //str += "          <span class=\"msg-avatar\">";
+        //str += "            <img src=\"https:\/\/image.crisp.im\/avatar\/operator\/196af8cc-f6ad-4ef7-afd1-c45d5231387c\/240\/?1483361727745\">";
+        //str += "          <\/span>";
+        str += "          <div class=\"cm-msg-text\">";
+        str += msg;
+        str += "          <\/div>";
+        str += "        <\/div>";
+        $(".chat-logs").append(str);
+        $("#cm-msg-" + INDEX).hide().fadeIn(300);
+        if (type == 'self') {
+            $("#chat-input").val('');
+        }
+        $(".chat-logs").stop().animate({
+            scrollTop: $(".chat-logs")[0].scrollHeight
+        }, 1000);
+    }
+
+    $(document).delegate(".chat-btn", "click", function() {
+        var value = $(this).attr("chat-value");
+        var name = $(this).html();
+        $("#chat-input").attr("disabled", false);
+        generate_message(name, 'self');
+        generate_message_correct(name, 'self');
+    })
+
+    $("#chat-circle").click(function() {
+        //$("#chat-circle").toggle('scale');
+        $(".chat-box").toggle('scale');
+    })
+
+    $(".chat-box-toggle").click(function() {
+        //$("#chat-circle").toggle('scale');
+        $(".chat-box").toggle('scale');
+    })
+
+    //Important
+
+    function RestartSegment() {
+        KeysDone -= 1
+        game.state.gameEndText[0].innerHTML = '';
+        document.getElementById("overview").style.visibility = "hidden";
+        game.reset();
+        game.init();
+        collection_id = JSON.parse(localStorage.getItem('user_progress'))['collection_id']
+        game.SetUpQuestion(collection_id);
+        play_next_resource();
+    }
+
+    function Feedback(ip) {
+        generate_message(ip, "user");
+        // $('.chat-box').toggle('scale');
+    }
+
+    function TakeSummary() {
+        generate_message("Please enter a summary of whatever you have understood from the resources till now", 'user');
+        $('.chat-box').toggle('scale');
+    }
+
+    function TakeQuiz() {
+        generate_message("You have completed a segment of the pathway! Please take a short quiz to continue.", 'user');
+        $('.chat-box').toggle('scale');
+    }
+
+    function GiveOverview(o) {
+        // for chatbot
+        generate_message("Here is an overview of the resources in the upcoming segment.")
+            // for showing modal
+        document.getElementById("overview").style.visibility = "visible";
+        document.getElementById("overview-header").innerHTML = "<b>Overview</b>";
+        document.getElementById("fetched-overview").innerHTML = o;
+        $('.chat-box').toggle('scale');
+    }
+
+    function QuizRedirect() {
+        $('#content').hide();
+        generate_message('Looks like your score was a bit low');
+        $('.chat-box').toggle('scale');
+        document.getElementById("overview").style.visibility = "visible";
+        document.getElementById("overview-header").innerHTML = "<b>Notification</b>";
+        document.getElementById("fetched-overview").innerHTML = 'Looks like your score was a bit low would you like to reiterate through the resources? <button id="okay-button" onclick="RestartSegment()"> Okay </button>';
+    }
+</script>
+
+<!----------------------------------------- RASA CHATBOT    ----------------------------------->
+
+<!-- <div id="webchat"></div> -->
+
+<!-- <script>
+    !(function() {
+        let e = document.createElement("script"),
+            t = document.getElementById("#webchat") || document.head;
+        (e.src =
+            "https://cdn.jsdelivr.net/npm/rasa-webchat@1.0.0/lib/index.js"),
+        // Replace 1.x.x with the version that you want
+        (e.async = !0),
+        (e.onload = () => {
+            window.WebChat.default({
+                    title: "ChatBot",
+                    //selector: "#webchat",
+                    initPayload: "/greet",
+                    customData: {
+                        language: "en"
+                    },
+                    socketUrl: "http://44.231.142.215:5005/",
+                    profileAvatar: "https://rasa.com/assets/img/demo/rasa_avatar.png",
+                    showCloseButton: true,
+                    fullScreenMode: false,
+                    // add other props here
+                    params: {
+                        storage: "session",
+                    }
+
+                },
+                null
+            );
+        }),
+        t.insertBefore(e, t.firstChild);
+    })();
+</script> -->
+
+<!------------------------------------------------------------------------------------------ -->
+
+
+<!-- ---------------------------------- Rasa Chatbot Logic ------------------------------------- -->
+<script>
+    //Testing function for the response from rasa actions server to read the json
+    // function readJson(data) {
+    //     console.log(data)
+    //     var x = data.events;
+    //     for (var i = 0; i < x.length; i++) {
+    //         if (x[i].event == "bot") {
+    //             console.log("came to http");
+    //             var z = x[i].text;
+    //             var y = z.substring(0, 4);
+    //             if (y == "http") {
+
+    //                 if (i == x.length - 2) {
+    //                     console.log(z);
+    //                     window.open(z, '_blank');
+    //                 }
+    //             }
+
+    //         }
+    //     }
+    // }
+    // //Testing function for the response from rasa actions server to get the json response
+    // function openResourcefile() {
+    //     //console.log(data);
+    //     var conversation_id = <%- JSON.stringify(Conversation_ID) %>;
+    //     console.log(conversation_id);
+
+    //     //conversationID = data['ID'];
+    //     //console.log('ConverstaionID:',conversationID);
+    //     $.ajax({
+    //         url: "http://44.231.142.215:5005/conversations/" + conversation_id + "/tracker",
+    //         type: "GET",
+    //         data: '{ "sender": message}'
+    //     }).done(function(data) {
+    //         readJson(data)
+    //     })
+    // }
+
+    // Welcome response on the dev console
+    function welcome() {
+        console.log('welcome to the site');
+    }
+</script>
+</script>

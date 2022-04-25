@@ -1,0 +1,103 @@
+<div class="d-flex" id="wrapper">
+    <%- include('./partials/sidebar.ejs') %>
+        <!--Page content-->
+        <div id="page-content-wrapper">
+
+            <nav class="navbar navbar-expand-lg navbar-light">
+                <ul class="navbar-nav mr-auto">
+                    <button class="btn btn-secondary" id="menu-toggle"><i class="fas fa-bars fa-2x" aria-hidden="true"></i></button>
+                    <div id="Buttons">
+                        <button class="btn btn-outline-primary" onclick="overview()">Overview</button>
+                        <button class="btn btn-outline-primary" onclick="quiz()">Quiz</button>
+                        <button class="btn btn-outline-primary" onclick="summary()">Summary</button>
+                    </div>
+                </ul>
+            </nav>
+            <div id="Content">
+
+            </div>
+        </div>
+</div>
+<script>
+    var this_pathway_id = <%- JSON.stringify(r_id) %>;
+    var groupIdsList = <%- JSON.stringify(groupIds) %>;
+    let groupIds = groupIdsList.filter((item, i, ar) => ar.indexOf(item) === i);
+    // console.log(groupIds);
+    // console.log(this_pathway_id);
+    // console.log("Hi to teacher from new NAteacher file.");
+
+    async function get_overview(collection_id, groupId, num) {
+        return $.ajax({
+            url: "http://44.231.142.215:5000/GetOverview/" + String(collection_id) + "/" + String(groupId),
+            type: "GET",
+            success: function(data) {
+                _overview = data.overview;
+                document.getElementById("Content").innerHTML += '<h2 id="Content-heading">Segment ' + num.toString() + '</h2>';
+                document.getElementById("Content").innerHTML += '<div id="Content-content"> ' + _overview + '</div><hr>';
+            },
+            error: function(error) {
+                console.log(error);
+            }
+        })
+    }
+
+    function get_summary(collection_id) {
+        return $.ajax({
+            url: "http://44.231.142.215:5000/GetSummary/" + String(collection_id),
+            type: "GET",
+            success: function(data) {
+                _summary = data.summary;
+                document.getElementById("Content").innerHTML = "<h2>Pathway summary </h2>"
+                document.getElementById("Content").innerHTML += "<div id='Content-content'> " + _summary + "</div>";
+            },
+            error: function(error) {
+                console.log(error);
+            }
+        })
+    }
+
+    async function get_quiz(collection_id, groupId, num) {
+        return $.ajax({
+            url: "http://44.231.142.215:5000/GetQuizDetails/" + String(collection_id) + "/" + String(groupId),
+            type: "GET",
+            success: async function(data) {
+                // console.log(JSON.parse(data.question));
+                console.log(data.question);
+                document.getElementById("template_question").innerHTML += '<h2>Segment ' + num.toString() + '</h2>';
+                for (var j = 1; j <= data.question.n; j++) {
+                    //document.getElementById("template_question").innerHTML += '<span>' + j.toString() + '.) </span>';
+                    document.getElementById("template_question").innerHTML += '<div style="display:inline" class="question">' + j.toString() + '. ' +
+                        data.question["ques" + j.toString()].ques + '</div><div class= "options" > a) ' + data.question["ques" + j.toString()].answer + '</div><div class= "options" > b) ' + data.question["ques" + j.toString()].option1 + '</div><div class= "options" > c) ' + data.question["ques" + j.toString()].option2 + '</div><div class= "options" > d) ' + data.question["ques" + j.toString()].option3 + '</div><hr>';
+                    //console.log(document.getElementById("template_question").innerHTML);
+                }
+            },
+            error: function(error) {
+                console.log(error);
+            }
+        })
+    }
+
+    async function overview() {
+        console.log("Overview");
+        document.getElementById("Content").innerHTML = "";
+        for (var i = 1; i <= groupIds.length; i++) {
+            await get_overview(this_pathway_id, groupIds[i - 1], i);
+        }
+    }
+
+    async function quiz() {
+        console.log("Quiz");
+        document.getElementById("Content").innerHTML = '<div id="template_question"></div>';
+        for (var i = 1; i <= groupIds.length; i++) {
+            await get_quiz(this_pathway_id, groupIds[i - 1], i);
+        }
+    }
+
+    function summary() {
+        console.log("Summary");
+        get_summary(this_pathway_id);
+    }
+</script>
+
+<!-- include CSS files -->
+<link href="/css/NarrativeArcTeacherStyle.css" rel="stylesheet" />
